@@ -182,29 +182,34 @@ function iniciarAutomatizacion() {
 }
 
 // === INICIALIZACIÓN AUTO-RECUPERABLE ===
+// === INICIALIZACIÓN AUTO-RECUPERABLE ===
 (async () => {
     try {
         console.log('[⚙️] Inicializando cliente de WhatsApp...');
         await client.initialize();
     } catch (error) {
         console.error('\n[💥] ERROR CRÍTICO AL INICIALIZAR:', error.message);
-        
-        // Verificamos si el error pinta a ser de Chromium/Contexto destruido
         console.log('[🧹] Iniciando protocolo de limpieza de sesión corrupta...');
         
         const authPath = path.join(__dirname, '.wwebjs_auth');
         
         if (fs.existsSync(authPath)) {
             try {
-                // Borramos la carpeta entera de forma recursiva
-                fs.rmSync(authPath, { recursive: true, force: true });
-                console.log('[✅] Sesión corrupta eliminada exitosamente.');
+                // Leemos todos los archivos y subcarpetas DENTRO del volumen
+                const contenidos = fs.readdirSync(authPath);
+                
+                // Borramos uno por uno
+                for (const item of contenidos) {
+                    const itemPath = path.join(authPath, item);
+                    fs.rmSync(itemPath, { recursive: true, force: true });
+                }
+                console.log('[✅] Contenido de la sesión corrupta vaciado exitosamente.');
             } catch (rmError) {
-                console.error('[⚠️] No se pudo eliminar la carpeta:', rmError);
+                console.error('[⚠️] No se pudo vaciar la carpeta:', rmError);
             }
         }
         
         console.log('[🔄] Forzando apagado. Dokploy reiniciará el contenedor en breve...\n');
-        process.exit(1); // El código 1 le indica a Dokploy que fue una caída por error, forzando el reinicio
+        process.exit(1); 
     }
 })();
