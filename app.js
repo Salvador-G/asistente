@@ -7,8 +7,6 @@ const fs = require('fs');
 const path = require('path');
 
 // === SERVIDOR DUMMY PARA DOKPLOY ===
-// Esto levanta un servidor vacío en el puerto 3000 para pasar el "Health Check"
-// de Dokploy y evitar que mate el contenedor con un SIGTERM.
 const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -18,15 +16,13 @@ http.createServer((req, res) => {
 });
 
 // === CONFIGURACIÓN ===
-const NUMERO_DESTINO = '51999888777@c.us'; 
+const NUMERO_DESTINO = '120363398248762250@g.us'; 
 const MINUTOS_MIN_RETRASO = 1;
 const MINUTOS_MAX_RETRASO = 5;
 const CODIGO_PAIS_FERIADOS = 'PE'; // Perú
 
 // === LIMPIEZA DE BLOQUEOS (ANTI-CRASH) ===
-// Ruta donde Chromium deja el candado dentro del volumen de LocalAuth
 const lockPath = path.join(__dirname, '.wwebjs_auth', 'session', 'SingletonLock');
-
 if (fs.existsSync(lockPath)) {
     try {
         fs.unlinkSync(lockPath);
@@ -53,6 +49,7 @@ const client = new Client({
     }
 });
 
+// === EVENTOS DEL CLIENTE ===
 client.on('qr', (qr) => {
     console.log('\n[!] Escanea el código QR para iniciar sesión:');
     qrcode.generate(qr, { small: true });
@@ -60,51 +57,32 @@ client.on('qr', (qr) => {
 
 client.on('ready', () => {
     console.log('\n[✓] ¡Bot de asistencia conectado y listo!');
-    console.log('[ℹ] Monitor de Sábados activo.\n');
-
-    // === TEST DE FERIADOS (Asíncrono para no bloquear) ===
-    console.log('[🔍] Probando conexión con la API de feriados...');
-    esFeriadoHoy().then(pruebaFeriado => {
-        console.log(`[📊 RESULTADO TEST] ¿Hoy está registrado como feriado?: ${pruebaFeriado ? 'SÍ 🌴' : 'NO 💼'}\n`);
-    });
-
-    // === EXTRACCIÓN DE GRUPOS CON RESPIRO ===
-    console.log('[⏳] Dando 15 segundos a WhatsApp para estabilizar la sincronización...');
-    
-    setTimeout(async () => {
-        try {
-            console.log('[🔍] Ahora sí, extrayendo lista de chats...');
-            const chats = await client.getChats();
-            const grupos = chats.filter(chat => chat.isGroup);
-            
-            console.log('\n==================== GRUPOS ENCONTRADOS ====================');
-            grupos.forEach(grupo => {
-                console.log(`📌 Nombre del Grupo: ${grupo.name}`);
-                console.log(`🆔 ID de Destino:    ${grupo.id._serialized}`);
-                console.log('------------------------------------------------------------');
-            });
-            console.log('============================================================\n');
-            
-        } catch (error) {
-            console.error('[❌] Error al listar los grupos:', error);
-        }
-    }, 15000); // 15,000 milisegundos de respiro
-
+    console.log('[ℹ] Sistema automatizado activo en background. Esperando horarios programados...\n');
     iniciarAutomatizacion();
 });
 
+// Eventos de seguridad por si cierras sesión manualmente desde el celular
+client.on('auth_failure', msg => {
+    console.error('\n[💥] FALLO DE AUTENTICACIÓN:', msg);
+    console.log('[🧹] La sesión fue revocada. Forzando reinicio y auto-limpieza...');
+    process.exit(1); 
+});
+
+client.on('disconnected', (reason) => {
+    console.log('\n[🔌] CLIENTE DESCONECTADO. Razón:', reason);
+    if (reason === 'NAVIGATION' || reason === 'LOGOUT') {
+        console.log('[🧹] Sesión cerrada. Apagando para auto-limpieza...');
+        process.exit(1); 
+    }
+});
+
 // === COMPROBADOR DE FERIADOS ===
-/**
- * Verifica si la fecha de hoy es un feriado en Perú
- * @returns {Promise<boolean>}
- */
 function esFeriadoHoy() {
     return new Promise((resolve) => {
-        const hoy = new Date().toLocaleDateString('es-PE', { timeZone: 'America/Lima' }); // Formato "DD/MM/YYYY"
+        const hoy = new Date().toLocaleDateString('es-PE', { timeZone: 'America/Lima' }); 
         const [dia, mes, anio] = hoy.split('/');
-        const fechaFormatoAPI = `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`; // "YYYY-MM-DD"
+        const fechaFormatoAPI = `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
 
-        // Usamos una API pública y estable de feriados (por ejemplo, date.nager.at que cubre Perú)
         const url = `https://date.nager.at/api/v3/PublicHolidays/${anio}/${CODIGO_PAIS_FERIADOS}`;
 
         https.get(url, (res) => {
@@ -113,17 +91,16 @@ function esFeriadoHoy() {
             res.on('end', () => {
                 try {
                     const feriados = JSON.parse(data);
-                    // Buscamos si la fecha de hoy está en la lista de feriados del año
                     const existeFeriado = feriados.some(f => f.date === fechaFormatoAPI);
                     resolve(existeFeriado);
                 } catch (e) {
-                    console.error('[⚠️] Error al procesar los feriados de la API, se asumirá que NO es feriado por seguridad.');
+                    console.error('[⚠️] Error en API de feriados, asumiendo día laborable.');
                     resolve(false);
                 }
             });
         }).on('error', (err) => {
-            console.error('[⚠️] No se pudo conectar a la API de feriados:', err.message);
-            resolve(false); // Si la API cae, por defecto asume que no es feriado para no dejarte sin marcar
+            console.error('[⚠️] Error de red con API de feriados:', err.message);
+            resolve(false);
         });
     });
 }
@@ -154,34 +131,27 @@ function iniciarAutomatizacion() {
         timezone: "America/Lima"
     };
 
-    // Cambiado a '6' (Sábado). Ejemplo: Entrada a las 08:55 AM
+    // Sábado a las 08:55 AM
     cron.schedule('55 8 * * 6', async () => {
-        console.log('\n[🔍] Verificando calendario de asistencia...');
-        const hoyEsFeriado = await esFeriadoHoy();
-        
-        if (hoyEsFeriado) {
-            console.log('[🌴] ¡Hoy es feriado oficial! El bot no enviará ningún mensaje de entrada.');
-            return; // Aborta la operación
+        console.log('\n[🔍] Verificando si hoy es feriado...');
+        if (await esFeriadoHoy()) {
+            console.log('[🌴] ¡Hoy es feriado oficial! No se enviará mensaje de entrada.');
+            return;
         }
-
         programarEnvioConRetraso('Buenos días, registro mi entrada.', 'ENTRADA (SÁBADO)');
     }, cronOptions);
 
-    // Salida a las 01:05 PM (13:05) por ser sábado
+    // Sábado a las 01:05 PM
     cron.schedule('5 13 * * 6', async () => {
-        console.log('\n[🔍] Verificando calendario de asistencia...');
-        const hoyEsFeriado = await esFeriadoHoy();
-        
-        if (hoyEsFeriado) {
-            console.log('[🌴] ¡Hoy es feriado oficial! El bot no enviará ningún mensaje de salida.');
-            return; // Aborta la operación
+        console.log('\n[🔍] Verificando si hoy es feriado...');
+        if (await esFeriadoHoy()) {
+            console.log('[🌴] ¡Hoy es feriado oficial! No se enviará mensaje de salida.');
+            return;
         }
-
         programarEnvioConRetraso('Buenas tardes, registro mi salida. Buen fin de semana.', 'SALIDA (SÁBADO)');
     }, cronOptions);
 }
 
-// === INICIALIZACIÓN AUTO-RECUPERABLE ===
 // === INICIALIZACIÓN AUTO-RECUPERABLE ===
 (async () => {
     try {
@@ -192,13 +162,9 @@ function iniciarAutomatizacion() {
         console.log('[🧹] Iniciando protocolo de limpieza de sesión corrupta...');
         
         const authPath = path.join(__dirname, '.wwebjs_auth');
-        
         if (fs.existsSync(authPath)) {
             try {
-                // Leemos todos los archivos y subcarpetas DENTRO del volumen
                 const contenidos = fs.readdirSync(authPath);
-                
-                // Borramos uno por uno
                 for (const item of contenidos) {
                     const itemPath = path.join(authPath, item);
                     fs.rmSync(itemPath, { recursive: true, force: true });
@@ -208,7 +174,6 @@ function iniciarAutomatizacion() {
                 console.error('[⚠️] No se pudo vaciar la carpeta:', rmError);
             }
         }
-        
         console.log('[🔄] Forzando apagado. Dokploy reiniciará el contenedor en breve...\n');
         process.exit(1); 
     }
