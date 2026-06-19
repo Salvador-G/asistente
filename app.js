@@ -181,4 +181,30 @@ function iniciarAutomatizacion() {
     }, cronOptions);
 }
 
-client.initialize();
+// === INICIALIZACIÓN AUTO-RECUPERABLE ===
+(async () => {
+    try {
+        console.log('[⚙️] Inicializando cliente de WhatsApp...');
+        await client.initialize();
+    } catch (error) {
+        console.error('\n[💥] ERROR CRÍTICO AL INICIALIZAR:', error.message);
+        
+        // Verificamos si el error pinta a ser de Chromium/Contexto destruido
+        console.log('[🧹] Iniciando protocolo de limpieza de sesión corrupta...');
+        
+        const authPath = path.join(__dirname, '.wwebjs_auth');
+        
+        if (fs.existsSync(authPath)) {
+            try {
+                // Borramos la carpeta entera de forma recursiva
+                fs.rmSync(authPath, { recursive: true, force: true });
+                console.log('[✅] Sesión corrupta eliminada exitosamente.');
+            } catch (rmError) {
+                console.error('[⚠️] No se pudo eliminar la carpeta:', rmError);
+            }
+        }
+        
+        console.log('[🔄] Forzando apagado. Dokploy reiniciará el contenedor en breve...\n');
+        process.exit(1); // El código 1 le indica a Dokploy que fue una caída por error, forzando el reinicio
+    }
+})();
