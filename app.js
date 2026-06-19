@@ -3,6 +3,17 @@ const qrcode = require('qrcode-terminal');
 const cron = require('node-cron');
 const https = require('https');
 
+// === SERVIDOR DUMMY PARA DOKPLOY ===
+// Esto levanta un servidor vacío en el puerto 3000 para pasar el "Health Check"
+// de Dokploy y evitar que mate el contenedor con un SIGTERM.
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Bot de WhatsApp funcionando correctamente.\n');
+}).listen(PORT, () => {
+    console.log(`[🌐] Servidor web dummy escuchando en el puerto ${PORT}`);
+});
+
 // === CONFIGURACIÓN ===
 const NUMERO_DESTINO = '51999888777@c.us'; 
 const MINUTOS_MIN_RETRASO = 1;
