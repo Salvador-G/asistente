@@ -2,6 +2,7 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const cron = require('node-cron');
 const https = require('https');
+const http = require('http');
 
 // === SERVIDOR DUMMY PARA DOKPLOY ===
 // Esto levanta un servidor vacío en el puerto 3000 para pasar el "Health Check"
