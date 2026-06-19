@@ -138,7 +138,7 @@ function iniciarAutomatizacion() {
             console.log('[🌴] ¡Hoy es feriado oficial! No se enviará mensaje de entrada.');
             return;
         }
-        programarEnvioConRetraso('Buenos días, registro mi entrada.', 'ENTRADA (SÁBADO)');
+        programarEnvioConRetraso('Buenos días, salvador ingreso', 'ENTRADA (SÁBADO)');
     }, cronOptions);
 
     // Sábado a las 01:05 PM
@@ -148,7 +148,7 @@ function iniciarAutomatizacion() {
             console.log('[🌴] ¡Hoy es feriado oficial! No se enviará mensaje de salida.');
             return;
         }
-        programarEnvioConRetraso('Buenas tardes, registro mi salida. Buen fin de semana.', 'SALIDA (SÁBADO)');
+        programarEnvioConRetraso('Salida salvador', 'SALIDA (SÁBADO)');
     }, cronOptions);
 }
 
