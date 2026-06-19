@@ -3,6 +3,8 @@ const qrcode = require('qrcode-terminal');
 const cron = require('node-cron');
 const https = require('https');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
 // === SERVIDOR DUMMY PARA DOKPLOY ===
 // Esto levanta un servidor vacío en el puerto 3000 para pasar el "Health Check"
@@ -20,6 +22,19 @@ const NUMERO_DESTINO = '51999888777@c.us';
 const MINUTOS_MIN_RETRASO = 1;
 const MINUTOS_MAX_RETRASO = 5;
 const CODIGO_PAIS_FERIADOS = 'PE'; // Perú
+
+// === LIMPIEZA DE BLOQUEOS (ANTI-CRASH) ===
+// Ruta donde Chromium deja el candado dentro del volumen de LocalAuth
+const lockPath = path.join(__dirname, '.wwebjs_auth', 'session', 'SingletonLock');
+
+if (fs.existsSync(lockPath)) {
+    try {
+        fs.unlinkSync(lockPath);
+        console.log('[🧹] Candado fantasma de Chromium (SingletonLock) eliminado exitosamente.');
+    } catch (err) {
+        console.error('[⚠️] No se pudo eliminar el SingletonLock:', err);
+    }
+}
 
 // === INICIALIZACIÓN DEL CLIENTE ===
 const client = new Client({
