@@ -43,33 +43,37 @@ client.on('qr', (qr) => {
     qrcode.generate(qr, { small: true });
 });
 
-client.on('ready', async () => {
+client.on('ready', () => {
     console.log('\n[✓] ¡Bot de asistencia conectado y listo!');
     console.log('[ℹ] Monitor de Sábados activo.\n');
-    
-    // === BLOQUE DIAGNÓSTICO TEMPORAL ===
-    try {
-        console.log('[🔍] Extrayendo lista de chats para identificar el grupo...');
-        const chats = await client.getChats();
-        const grupos = chats.filter(chat => chat.isGroup);
-        
-        console.log('\n==================== GRUPOS ENCONTRADOS ====================');
-        grupos.forEach(grupo => {
-            console.log(`📌 Nombre del Grupo: ${grupo.name}`);
-            console.log(`🆔 ID de Destino:    ${grupo.id._serialized}`);
-            console.log('------------------------------------------------------------');
-        });
-        console.log('============================================================\n');
-        
-    } catch (error) {
-        console.error('[❌] Error al listar los grupos:', error);
-    }
 
-    // Probar la API de feriados inmediatamente al iniciar
+    // === TEST DE FERIADOS (Asíncrono para no bloquear) ===
     console.log('[🔍] Probando conexión con la API de feriados...');
-    const pruebaFeriado = await esFeriadoHoy();
-    console.log(`[📊 RESULTADO TEST] ¿Hoy está registrado como feriado?: ${pruebaFeriado ? 'SÍ 🌴' : 'NO 💼'}\n`);
-    // ===================================
+    esFeriadoHoy().then(pruebaFeriado => {
+        console.log(`[📊 RESULTADO TEST] ¿Hoy está registrado como feriado?: ${pruebaFeriado ? 'SÍ 🌴' : 'NO 💼'}\n`);
+    });
+
+    // === EXTRACCIÓN DE GRUPOS CON RESPIRO ===
+    console.log('[⏳] Dando 15 segundos a WhatsApp para estabilizar la sincronización...');
+    
+    setTimeout(async () => {
+        try {
+            console.log('[🔍] Ahora sí, extrayendo lista de chats...');
+            const chats = await client.getChats();
+            const grupos = chats.filter(chat => chat.isGroup);
+            
+            console.log('\n==================== GRUPOS ENCONTRADOS ====================');
+            grupos.forEach(grupo => {
+                console.log(`📌 Nombre del Grupo: ${grupo.name}`);
+                console.log(`🆔 ID de Destino:    ${grupo.id._serialized}`);
+                console.log('------------------------------------------------------------');
+            });
+            console.log('============================================================\n');
+            
+        } catch (error) {
+            console.error('[❌] Error al listar los grupos:', error);
+        }
+    }, 15000); // 15,000 milisegundos de respiro
 
     iniciarAutomatizacion();
 });
